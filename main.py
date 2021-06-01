@@ -20,7 +20,7 @@ def run_vmc(start_alpha, samples, iterations, learning_rate, metropolis_step):
         psider = np.zeros(samples_number)
 
         for n in range(samples_number):
-            vmc.Step(metropolis_step)
+            vmc.Metropolis(metropolis_step)
 
             elocs[n] = (vmc.LocalEnergy())
             psider[n] = (psi.DerLog(vmc.x))
@@ -50,6 +50,6 @@ if __name__ == "__main__":
     plt.plot(optimized_ener)
     plt.axhline(0.5, color='black')
     plt.ylabel('Energy')
-    plt.xlabel('#Iteration')
+    plt.xlabel('Iteration')
     plt.show()
 

@@ -10,8 +10,6 @@ class State:
     def GetPsi(self, x):
         return np.exp(self.alpha*x**2.)
 
-    #Computes the Derivative of LogPsi with
-    #srespect to the variational parameter
     def DerLog(self, x):
         return x**2.
 
