@@ -1,0 +1,225 @@
+---
+jupyter:
+  jupytext:
+    text_representation:
+      extension: .Rmd
+      format_name: rmarkdown
+      format_version: '1.2'
+      jupytext_version: 1.3.0
+  kernelspec:
+    display_name: Python 3
+    language: python
+    name: python3
+---
+
+# Modelowanie Procesów Stochastycznych
+## Projekt :   Szukanie stanu podstawowego dla kwantowego scylatora harmonicznego z wykorzystaniem Algorytmu Metropolisa i wariacyjnej metody Monte-Carlo 
+### Joanna Gajewska
+
+<!-- #region -->
+Problem optymalizacyjny - znaleźć minimum energetyczne dla stanu podstawowego oscylatora harmonicznego (jest to tak naprawdę funkcja kosztu)
+\begin{equation}
+E([\psi]) = < \psi |H|\psi> \ge E_0
+\end{equation}
+
+Aby znaleźć stan podstawowy skorzystam ze stochastycznych metod, mianowicie wariacyjnej metody Monte Carlo. Załóżmy, że stan układu opisuje dany wektor $|x>$, to co robi wariacyjna metoda MC, to generuje nam próbki stanu uładu w tym przypadku posługując się algorytmem Metropolis-Hastings.
+
+### Algorytm Metropolis-Hastings
+Algorytm polega na powtarzaniu coraz dokładniejszych iteracji próbkowania rozkładu P(x) (w naszym przypadku $\psi(x)$), w oparciu o błądzenie losowe według wybranej funkcji zgodnie z następującymi krokami:
+* Pierwszy stan $x$ łańcucha Markowa jest wybierany losowo.
+* Kolejny stan jest wybierany według określonej funkcji błądzenia losowego  g(x'|x), w naszym przypadku :
+$x' = x+ 0.5 * a$, gdzie $a$ jest losowana z rozkładu jednorodnego z zadanego zakresu
+* Ocena nowego stanu odbywa się według kryterium: $\frac{\psi(x')}{\psi(x)} > random\_value$, gdzie $random\_value$ jest losowane z rozkładu jednorodnego z zakresu \[0,1\]
+* Testowanie lokalnych stanów $x$ odbywa się  przez przyjętą $N_s$ liczbę powtórzeń
+* Po przetestowaniu stanu $x'$ jest on zapisany jako nowy $x$ i algorytm szuka kolejnego punktu $x'$
+
+
+Wracając do wariacyjnej metody Monte Carlo, korzystając z wyżej opisanego algorytu Metropolis odbywa się próbkowanie, na ich podstawie obliczamy tak zwaną lokalną energię:
+\begin{equation}
+E_{loc}(x) = \sum_{xx'} \frac{H_{xx'} \psi(x')}{ \psi(x)}
+\end{equation}
+
+Energię stanu podstwaowego, możemy przybliżyć w następujący sposób:
+\begin{equation}
+E_0([\psi]) = <<E_{loc}(x) >> \approx \frac{1}{N_s} \sum E_{loc}(x)
+\end{equation}
+
+gdzie $N_s$ jest to liczba próbek stanu układu. 
+
+
+Aby zbiec do minimum funkcji kosztu (energii) korzystamy ze Stochastic Gradient Descent, który to ma za zadanie aktualizować optymalizowane parametry w następujący sposób
+
+\begin{equation}
+    p_{k}^{i+1}=p_{k}^{i}- \eta \partial_{p_k} <E(\psi)>
+\end{equation}
+
+Aby obliczyć pochodną cząstkową energii po optymalizowanym parametrze, wprowadźmy poniższą funkcje:
+
+\begin{equation}
+    D_k(x) = \frac{\partial_{p_k} \psi(x)}{\psi(x)}
+\end{equation}
+Pochodną cząstkową możemy policzyć w następujący sposób:
+
+\begin{equation}
+    \partial_{p_k} <E(\psi)> = << E_{loc}D_k^*>> - <<E_{loc}>> <<D_k^*>>
+\end{equation}
+<!-- #endregion -->
+
+<!-- #region -->
+### Eksperyment
+Projekt ten miał na celu znalezienie energetycznego stanu podstawowego kwantowego oscylatora harmonicznego, którego hamiltonian wygląda następująco: 
+\begin{equation}
+     \hat{H} = \frac{-\hbar^2}{2m} \frac{d^2}{dx^2} + \frac{1}{2}m \omega^2 x^2
+\end{equation} 
+Energia stanu podstawowego oscylatora harmonicznego jest równa
+
+\begin{equation}
+E_0 = \frac{1}{2} \hbar \omega
+\end{equation}
+
+a funkcja falowa dla stanu podstawowego wygląda następująco 
+
+\begin{equation}
+    \psi_0 = (\frac{m \omega}{\pi \hbar})^{1/4} e^{-\frac{m \omega}{\hbar} 0.5 x^2}
+\end{equation}
+
+
+Dla uproszczenia w eksperymencie pracuję na hamiltonianie bezwymiarowym:
+
+\begin{equation}
+E_0 = \frac{1}{2} 
+\end{equation}
+
+\begin{equation}
+    \psi_0 =  e^{-0.5 x^2} = e^{- \alpha x^2} 
+\end{equation}
+ 
+Napisany przeze mnie program ma na celu opytamlizacje parametru $\alpha$ tak by osiągnąć minimum energetyczne
+<!-- #endregion -->
+
+```{python}
+from main import run_vmc
+import sys
+# !{sys.executable} -m pip install plotly
+import plotly.graph_objects as go
+import numpy as np
+start_alpha = -1
+smaples_numb = 1000
+iterations_numb = 200
+learning_rate = 0.5
+metropolis_step = 0.1
+
+```
+
+### Badanie wpływu liczby próbek na zbieżność funkcji energii
+
+```{python}
+samples_dict = {}
+fig = go.Figure()
+
+for samples_n in [10, 100, 1000, 10000]:
+    samples_dict[samples_n] = optimized_ener = run_vmc(start_alpha, samples_n, iterations_numb, learning_rate, metropolis_step)
+    fig.add_trace(go.Scatter(
+        x=np.arange(0, iterations_numb), y=samples_dict[samples_n], 
+               name='Liczba próbek: {}'.format(samples_n)))
+    
+fig.add_trace(go.Line(x=list(range(0, iterations_numb)), y= [0.5 for i in range(0, iterations_numb)], 
+        name='Energia stanu podstawowego'))
+
+fig.update_layout(
+    title="Badanie wpływu liczby próbek",
+    xaxis_title="iteracje",
+    yaxis_title="Energia",
+    font=dict(
+        family="Courier New, monospace",
+        size=18,
+        color="RebeccaPurple")
+    )
+fig.show()
+```
+
+### Badanie wpływu wartości inicjalizującej parametr alpha na zbieżność energii do minimum
+
+```{python}
+alpha_dict = {}
+fig = go.Figure()
+
+for alpha in [-20, -10, -5, -1, -0.5, 0]:
+    alpha_dict[alpha] = optimized_ener = run_vmc(alpha, smaples_numb, iterations_numb, learning_rate, metropolis_step)
+    fig.add_trace(go.Scatter(
+        x=np.arange(0, iterations_numb), y=alpha_dict[alpha], 
+               name='Startowe alpha: {}'.format(alpha)))
+    
+fig.add_trace(go.Line(x=list(range(0, iterations_numb)), y= [0.5 for i in range(0, iterations_numb)], 
+        name='Energia stanu podstawowego'))
+
+fig.update_layout(
+    title="Badanie wpływu  wartości inicjalizującej parametr alpha",
+    xaxis_title="iteracje",
+    yaxis_title="Energia",
+    font=dict(
+        family="Courier New, monospace",
+        size=18,
+        color="RebeccaPurple")
+    )
+fig.show()
+```
+
+### Badanie wpływu  wartości współczynnika uczenia się na zbieżność funkcji energii
+
+
+```{python}
+lr_dict = {}
+fig = go.Figure()
+
+for lr in [0.01, 0.05, 0.1, 0.5, 1]:
+    lr_dict[lr] = optimized_ener = run_vmc(start_alpha, smaples_numb, iterations_numb, lr, metropolis_step)
+    fig.add_trace(go.Scatter(
+        x=np.arange(0, iterations_numb), y=lr_dict[lr], 
+               name='Współczynnik uczenia się: {}'.format(lr)))
+    
+fig.add_trace(go.Line(x=list(range(0, iterations_numb)), y= [0.5 for i in range(0, iterations_numb)], 
+        name='Energia stanu podstawowego'))
+
+fig.update_layout(
+    title="Badanie wpływu  wartości współczynnika uczenia się",
+    xaxis_title="iteracje",
+    yaxis_title="Energia",
+    font=dict(
+        family="Courier New, monospace",
+        size=18,
+        color="RebeccaPurple")
+    )
+fig.show()
+```
+
+### Badanie wpływu zakresu z jakiego jest losowana nowa wartość x w algorytmie Metropolis, na proces uczenia się
+
+```{python}
+step_dict = {}
+fig = go.Figure()
+
+for step in [0.01, 0.05, 0.1, 0.5, 1]:
+    step_dict[step] = optimized_ener = run_vmc(start_alpha, smaples_numb, iterations_numb, learning_rate, step)
+    fig.add_trace(go.Scatter(
+        x=np.arange(0, iterations_numb), y=step_dict[step], 
+               name='Zakres: [-{}, {}]'.format(step, step)))
+    
+fig.add_trace(go.Line(x=list(range(0, iterations_numb)), y= [0.5 for i in range(0, iterations_numb)], 
+        name='Energia stanu podstawowego'))
+
+fig.update_layout(
+    title="Badanie wpływu zakresu z jakiego jest losowana nowa wartość x w algorytmie Metropolis",
+    xaxis_title="iteracje",
+    yaxis_title="Energia",
+    font=dict(
+        family="Courier New, monospace",
+        size=18,
+        color="RebeccaPurple")
+    )
+fig.show()
+```
+
+```{python}
+
+```
